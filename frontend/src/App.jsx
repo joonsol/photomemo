@@ -1,35 +1,51 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useEffect, useState } from 'react'
+import api from './api/client'
+import AdminAuthPanel from './components/AdminAuthPanel'
+import './app.css'
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [user, setUser] = useState(() => {
+    const raw = localStorage.getItem('user')
+    return raw ? JSON.parse(raw) : null
+  })
+  const [token, setToken] = useState(() => localStorage.getItem('token'))
+  const [me, setMe] = useState(null)
+  const isAuthed = !!token
+
+  const handleAuthed = ({ user, token }) => {
+    setUser(user)
+    setToken(token)
+    localStorage.setItem('user', JSON.stringify(user))
+    localStorage.setItem('token', token)
+  }
+
+  const logout = () => {
+    setUser(null); setToken(null); setMe(null)
+    localStorage.removeItem('user'); localStorage.removeItem('token')
+  }
+
+  const fetchMe = async () => {
+    try {
+      const { data } = await api.get('/api/auth/me')
+      setMe(data)
+    } catch (e) {
+      setMe({ error: e.response?.data || '실패' })
+    }
+  }
+
+  useEffect(() => {}, [])
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <div className="page">
+      <AdminAuthPanel
+        isAuthed={isAuthed}
+        user={user}
+        me={me}
+        onFetchMe={fetchMe}
+        onLogout={logout}
+        onAuthed={handleAuthed}
+        requiredRole="admin"  // 관리자만 허용하려면 유지, 필요 없으면 제거
+      />
+    </div>
   )
 }
-
-export default App
