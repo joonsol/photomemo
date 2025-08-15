@@ -1,6 +1,9 @@
+// src/App.jsx
 import { useEffect, useState } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'   // ✅ 추가
 import api from './api/client'
 import AdminAuthPanel from './components/AdminAuthPanel'
+import Landing from './pages/Landing'
 import './app.css'
 
 export default function App() {
@@ -35,17 +38,34 @@ export default function App() {
 
   useEffect(() => {}, [])
 
+
   return (
     <div className="page">
-      <AdminAuthPanel
-        isAuthed={isAuthed}
-        user={user}
-        me={me}
-        onFetchMe={fetchMe}
-        onLogout={logout}
-        onAuthed={handleAuthed}
-        requiredRole="admin"  // 관리자만 허용하려면 유지, 필요 없으면 제거
-      />
+      <Routes>
+        {/* 공개 라우트 */}
+        <Route path="/" element={<Landing />} />
+
+        {/* 관리자 인증 패널 라우트 */}
+        <Route
+          path="/admin"
+          element={
+            <section className="container" style={{ padding: '2.4rem 0' }}>
+              <AdminAuthPanel
+                isAuthed={isAuthed}
+                user={user}
+                me={me}
+                onFetchMe={fetchMe}
+                onLogout={logout}
+                onAuthed={handleAuthed}
+                requiredRole="admin"  // 필요 없으면 지워도 됨
+              />
+            </section>
+          }
+        />
+
+        {/* 그 외 → 홈으로 */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </div>
   )
 }
