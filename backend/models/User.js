@@ -10,8 +10,7 @@ const userSchema = new mongoose.Schema(
     email: {
       type: String,
       required: true,
-    
-      lowercase: true,
+          lowercase: true,
       trim: true,
       match: [EMAIL_REGEX, "유효한 이메일"]
     },
