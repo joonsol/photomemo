@@ -20,8 +20,9 @@ mongoose.connect(process.env.MONGO_URI)
   .catch((err) => console.error("MongoDB 연결 실패:", err.message));
 
 app.get("/", (_req, res) => res.send("PhotoMemo API OK"));
+const postRoutes = require("./routes/post");
 app.use("/api/auth", require("./routes/authRoutes"));
-
+app.use("/api/post", postRoutes);
   app.use((err, _req, res, _next) => {
   console.error(err);
   res.status(500).json({ message: "서버 오류", error: err.message });
