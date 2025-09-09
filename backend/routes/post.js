@@ -3,7 +3,15 @@ const router = express.Router();
 const Post = require("../models/Post");
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
-
+const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3'); // S3 파일 삭제
+const { marked } = require('marked'); // 마크다운 파서
+const s3Client = new S3Client({
+    region: process.env.AWS_REGION,
+    credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_ACCESS_KEY
+    }
+});
 const authenticateToken = (req, res, next) => {
     const token =req.cookies.token;
 
@@ -20,7 +28,7 @@ const authenticateToken = (req, res, next) => {
     }
 }
 
-router.post("/",async(req, res)=>{
+router.post("/",authenticateToken,async(req, res)=>{
     try {
         const {title, content, fileUrl}=req.body;
 
@@ -61,7 +69,7 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ message: "게시글을 찾을 수 없습니다." })
     }
 
-    /*
+
     // ▼▼▼ 아래는 'IP + User-Agent 기반으로 중복 조회 방지 후 조회수 증가' 로직 ▼▼▼
 
     // 1. 사용자 IP 주소 가져오기 (우선 외부 API → 실패 시 req.ip 사용)
@@ -98,13 +106,27 @@ router.get("/:id", async (req, res) => {
       });
       await post.save(); // 변경사항 저장
     }
-    */
 
-    // 현재는 조회수 증가 로직 없이 post를 그대로 저장하고 응답 (불필요하면 이 줄은 삭제해도 무방)
-    await post.save();
 
-    // 조회된 게시글 데이터를 클라이언트에 응답
-    res.json(post);
+         
+        let htmlContent;
+        try {
+            htmlContent=marked.parse(post.content||'')
+
+
+        } catch (error) {
+            console.log("마크다운 변환 실패",error)
+            htmlContent=post.content;
+        }
+
+        const responseData = {
+            ...post.toObject(),
+            renderedContent:htmlContent,
+
+        }
+        //변경
+        res.json(responseData)
+
 
   } catch (error) {
     // 예외 발생 시 500 서버 오류 반환
@@ -112,99 +134,112 @@ router.get("/:id", async (req, res) => {
   }
 })
 
+// 게시글 수정 (PUT) + 기존 이미지 삭제 처리 포함
 router.put("/:id", async (req, res) => {
-  try {
-    // 클라이언트에서 전달된 수정 데이터 추출
-    const { title, content, fileUrl } = req.body;
-
-    // 해당 ID의 게시글이 DB에 존재하는지 조회
-    const post = await Post.findById(req.params.id);
-
-    // 게시글이 없으면 404 Not Found 응답 반환
-    if (!post) {
-      return res.status(404).json({ message: "게시글을 찾을 수 없습니다." });
-    }
-
-    // 게시글 정보 업데이트
-    post.title = title;              // 제목 수정
-    post.content = content;          // 내용 수정
-    post.fileUrl = fileUrl;          // 첨부 파일 수정
-    post.updatedAt = Date.now();     // 수정 시간 갱신
-
-    // 수정된 게시글을 DB에 저장
-    await post.save();
-
-    // 클라이언트에 성공 응답 반환 (수정된 게시글 데이터)
-    res.json(post);
-
-  } catch (error) {
-    // 예외 발생 시 500 서버 오류 응답
-    return res.status(500).json({ message: "서버 오류 put" });
-  }
-});
+    try {
+        const { title, content, fileUrl } = req.body
+        const post = await Post.findById(req.params.id)
 
 
-router.delete("/:id", async (req, res) => {
-  try {
-    // 요청된 ID를 기반으로 게시글을 DB에서 조회
-    const post = await Post.findById(req.params.id);
-
-    // 게시글이 존재하지 않으면 404 오류 반환
-    if (!post) {
-      return res.status(404).json({ message: "게시글을 찾을 수 없습니다." });
-    }
-
-    // 게시글 본문(content)에서 이미지 URL 추출 (S3 주소 중 확장자 포함된 것만 추출)
-    const imgRegex =
-      /https:\/\/[^"']*?\.(?:png|jpg|jpeg|gif|PNG|JPG|JPEG|GIF)/g;
-
-    // 본문에 있는 이미지 URL 목록을 배열로 반환 (없으면 빈 배열)
-    const contentImages = post.content.match(imgRegex) || [];
-
-    // S3 URL → S3 객체 키(key) 추출 함수
-    const getS3KeyFromUrl = (url) => {
-      try {
-        const urlObj = new URL(url);                // URL 객체로 파싱
-        return decodeURIComponent(urlObj.pathname.substring(1)); // "/버킷경로"에서 앞의 슬래시 제거
-      } catch (error) {
-        console.log("URL 파싱 에러: ", error);
-        return null;
-      }
-    };
-
-    // 삭제 대상 파일 URL 리스트 생성 (본문 이미지 + 첨부 파일)
-    const allFiles = [...contentImages, ...(post.fileUrl || [])];
-
-    // 각 파일 URL을 반복하면서 S3에서 삭제
-    for (const fileUrl of allFiles) {
-      const key = getS3KeyFromUrl(fileUrl); // key 추출
-      if (key) {
-        console.log("파일 삭제 시작: ", key);
-        try {
-          // AWS S3에서 해당 파일 삭제 요청
-          await s3Client.send(
-            new DeleteObjectCommand({
-              Bucket: process.env.AWS_BUCKET_NAME, // 삭제할 S3 버킷
-              Key: key,                            // 삭제할 파일의 키
-            })
-          );
-          console.log("파일 삭제 완료: ", key);
-        } catch (error) {
-          console.log("S3 파일 삭제 에러: ", error);
+        if (!post) {
+            return res.status(404).json({ message: "게시글을 찾을 수 없습니다." })
         }
-      }
+        // 기존 이미지 목록과 새 이미지 목록 비교
+        const imgRegex = /https:\/\/[^"']*?\.(?:png|jpg|jpeg|gif|PNG|JPG|JPEG|GIF)/g;
+        const oldContentImages = post.content.match(imgRegex) || [];
+        const newContentImages = content.match(imgRegex) || [];
+
+        const deletedImages = oldContentImages.filter(
+            (url) => !newContentImages.includes(url)
+        )
+        const deletedFiles = oldContentImages.filter(
+            (url) => !(fileUrl || []).includes(url)
+        )
+        // URL에서 S3 키 추출 함수
+        const getS3keyFromUrl = (url) => {
+            try {
+                const urlObj = new URL(url);
+                return decodeURIComponent(urlObj.pathname.substring(1))
+            } catch (error) {
+                console.log("URL 파싱 에러", err)
+                return null;
+            }
+        }
+        // 삭제 대상 파일들을 S3에서 삭제
+        const allDeletedFiles = [...deletedImages, ...deletedFiles]
+        for (const fileUrl of allDeletedFiles) {
+            const key = getS3keyFromUrl(fileUrl)
+
+            if (key) {
+                console.log("파일 삭제 완료", key)
+                try {
+                    await s3Client.send(
+                        new DeleteObjectCommand({
+                            Bucket: process.env.AWS_BUCKET_NAME,
+                            Key: key,
+                        })
+                    )
+                } catch (error) {
+                    console.log("S3 파일 삭제 에러: ", error);
+                }
+            }
+        }
+
+
+        // 게시글 내용 갱신
+        post.title = title
+        post.content = content
+        post.fileUrl = fileUrl
+        post.updatedAt = Date.now()
+
+
+        await post.save()
+        res.json(post)
+
+    } catch (error) {
+
+        res.status(500).json({ message: "서버오류 get" })
     }
+})
 
-    // 게시글 자체를 DB에서 삭제
-    await post.deleteOne();
+// 게시글 삭제 (DELETE) + 이미지 S3 삭제 처리 포함
+router.delete("/:id", async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.id);
 
-    // 성공 응답 반환
-    res.json({ message: "게시글이 삭제가 되었습니다." });
+        if (!post) {
+            return res.status(404).json({ message: "게시글을 찾을 수 없습니다." });
+        }
 
-  } catch (error) {
-    // 서버 내부 에러 처리
-    return res.status(500).json({ message: "서버 오류 delete" });
-  }
+        const imgRegex = /https:\/\/[^"']*?\.(?:png|jpg|jpeg|gif|PNG|JPG|JPEG|GIF)/g;
+        const contentImages = post.content.match(imgRegex) || [];
+
+        const getS3KeyFromUrl = (url) => {
+            try {
+                const urlObj = new URL(url);
+                return decodeURIComponent(urlObj.pathname.substring(1));
+            } catch (error) {
+                return null;
+            }
+        };
+
+        const allFiles = [...contentImages, ...(post.fileUrl || [])];
+        for (const fileUrl of allFiles) {
+            const key = getS3KeyFromUrl(fileUrl);
+            if (key) {
+                try {
+                    await s3Client.send(new DeleteObjectCommand({ Bucket: process.env.AWS_BUCKET_NAME, Key: key }));
+                } catch (error) {
+                    console.log("S3 파일 삭제 에러: ", error);
+                }
+            }
+        }
+
+        await post.deleteOne();
+        res.json({ message: "게시글이 삭제 되었습니다." });
+    } catch (error) {
+        res.status(500).json({ message: "서버오류 delete" });
+    }
 });
 
 module.exports=router

@@ -3,12 +3,12 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const dotenv = require("dotenv");
 dotenv.config();
-
-
+const cookieParser = require("cookie-parser");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 
+app.use(cookieParser()); 
 app.use(cors({ origin: process.env.CORS_ORIGIN || "http://localhost:5173" }));
 
 
@@ -21,7 +21,9 @@ mongoose.connect(process.env.MONGO_URI)
 
 app.get("/", (_req, res) => res.send("PhotoMemo API OK"));
 const postRoutes = require("./routes/post");
+const uploadRoutes = require("./routes/upload")
 app.use("/api/auth", require("./routes/authRoutes"));
+app.use("/api/upload", uploadRoutes);
 app.use("/api/post", postRoutes);
   app.use((err, _req, res, _next) => {
   console.error(err);
