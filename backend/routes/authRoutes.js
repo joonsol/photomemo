@@ -15,23 +15,40 @@ function makeToken(user) {
 
 
 
-// 회원가입
+// routes/auth.js (회원가입 부분)
 router.post("/register", async (req, res) => {
   try {
-    const { email, password, displayName } = req.body;
-    if (!email || !password) return res.status(400).json({ message: "email, password 필요" });
+    const { email, password, displayName, role } = req.body;
 
+    if (!email || !password) {
+      return res.status(400).json({ message: "이메일/비밀번호 필요" });
+    }
+
+    // 이미 존재하는 이메일인지 확인
     const exists = await User.findOne({ email: email.toLowerCase() });
-    if (exists) return res.status(400).json({ message: "이미 사용 중인 이메일" });
+    if (exists) return res.status(400).json({ message: "이미 가입된 이메일" });
 
+    // 비밀번호 해시
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await User.create({ email, displayName, passwordHash });
 
-    res.status(201).json({ user: user.toSafeJSON(), token: makeToken(user) });
+    // role 값이 유효한지 확인 (user / admin 둘 중 하나만 허용)
+    const validRoles = ["user", "admin"];
+    const safeRole = validRoles.includes(role) ? role : "user";
+
+    // 새 유저 생성
+    const user = await User.create({
+      email,
+      displayName,
+      passwordHash,
+      role: safeRole,
+    });
+
+    res.status(201).json({ user: user.toSafeJSON() });
   } catch (err) {
     res.status(500).json({ message: "회원가입 실패", error: err.message });
   }
 });
+
 
 // 로그인
 router.post("/login", async (req, res) => {

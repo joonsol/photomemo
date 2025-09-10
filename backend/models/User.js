@@ -13,6 +13,8 @@ const userSchema = new mongoose.Schema(
       match: [EMAIL_REGEX, "유효한 이메일"],
       unique: true,
     },
+    isLoggedIn: { type: Boolean, default: false },
+
     passwordHash: { type: String, required: true },
     displayName: { type: String, trim: true, default: "" },
     role: { type: String, enum: ["user", "admin"], default: "user" },
