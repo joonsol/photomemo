@@ -59,20 +59,29 @@ router.post("/login", async (req, res) => {
     if (!user) return res.status(400).json(invalidMsg);
 
     const ok = await user.comparePassword(password);
-    if (!ok) return res.status(400).json(invalidMsg);
+    if (!ok) {
+      user.loginAttempts += 1
 
-    // 로그인 성공 → 플래그/로그인시각 업데이트
-    const updated = await User.findByIdAndUpdate(
-      user._id,
-      { $set: { isLoggined: true, lastLoginAt: new Date() } },
-      { new: true }
-    )
-    if (!updated) {
-      // 이론상 드물지만, 안전망
-      return res.status(500).json({ message: "로그인 상태 갱신 실패" });
+      if (user.loginAttempts >= 5) {
+        user.isActive = false
+      }
+
+      await user.save()
+      return res.status(400).json({
+        invalidMsg,
+        message: `남은 횟수 : ${5 - user.loginAttempts}번`
+      });
     }
 
-    const token = makeToken(updated);
+
+    user.loginAttempts = 0
+    user.isLoggined = true;
+    user.lastLoginAt = new Date()
+
+    await user.save()
+
+
+    const token = makeToken(user);
 
     res.cookie("token", token, {
       httpOnly: true,
@@ -82,7 +91,7 @@ router.post("/login", async (req, res) => {
     });
 
     return res.status(200).json({
-      user: updated.toSafeJSON(),
+      user: user.toSafeJSON(),
       token, // 쿠키를 쓰면 이 줄은 제거해도 됨
     });
   } catch (err) {
@@ -164,9 +173,9 @@ router.post("/logout", async (req, res) => {
       sameSite: "lax",
       secure: "production",
     });
-      return res.status(200).json({ message: "로그아웃 성공" });
+    return res.status(200).json({ message: "로그아웃 성공" });
   } catch (error) {
- return res.status(500).json({ message: "로그아웃 실패", error: err.message });
+    return res.status(500).json({ message: "로그아웃 실패", error: err.message });
   }
 })
 module.exports = router;

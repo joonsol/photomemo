@@ -37,22 +37,26 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
+    loginAttempts: {
+      type: Number,
+      default: 0,
+    }
   },
   { timestamps: true }
 )
 
-userSchema.methods.comparePassword = function(plain){
-  return bcrypt.compare(plain,this.passwordHash)
+userSchema.methods.comparePassword = function (plain) {
+  return bcrypt.compare(plain, this.passwordHash)
 }
 
-userSchema.methods.toSafeJSON=function(){
-  const obj = this.toObject({versionKey:false})
+userSchema.methods.toSafeJSON = function () {
+  const obj = this.toObject({ versionKey: false })
   delete obj.passwordHash;
   return obj
 }
 
 
-userSchema.index({email:1},{unique:true})
+userSchema.index({ email: 1 }, { unique: true })
 
 
-module.exports =mongoose.model("User",userSchema)
+module.exports = mongoose.model("User", userSchema)
