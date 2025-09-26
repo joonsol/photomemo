@@ -1,5 +1,5 @@
 
-import './App.css'
+import './App.scss'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import AdminAuthPanel from "./components/AdminAuthPanel"
 import Landing from './pages/Landing'

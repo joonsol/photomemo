@@ -1,0 +1,16 @@
+/* 페이지 베이스 */
+.page {
+  min-height: 100vh;
+  background: var(--bg);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+/* 좁은 컨테이너 */
+.container-sm {
+  max-width: 72rem; /* 720px */
+  margin: 0 auto;
+  padding: 0 1.6rem;
+}
