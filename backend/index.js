@@ -5,6 +5,7 @@ const dotenv = require("dotenv");
 const cookieParser = require('cookie-parser');
 dotenv.config();
 const authRoutes = require('./routes/authRoutes')
+const auth = require("./middlewares/auth")
 const app = express();
 const PORT = process.env.PORT
 
@@ -21,13 +22,13 @@ mongoose.connect(process.env.MONGO_URI)
 
 
 
-app.use("/api/auth", authRoutes);  
+app.use("/api/auth", auth, authRoutes);
 app.get("/", (_req, res) => res.send("PhotoMemo API OK"));
 
 
 app.use((req, res) => {
 
-  res.status(500).json({ message: "서버 오류"});
+  res.status(500).json({ message: "서버 오류" });
 });
 
 app.listen(PORT, () => {
