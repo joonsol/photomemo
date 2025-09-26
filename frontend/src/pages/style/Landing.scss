@@ -1,0 +1,50 @@
+.landing {
+  padding: 4rem 0;
+
+  .landing-hero {
+    padding: 6rem 0;
+    text-align: center;
+    background: linear-gradient(135deg, #f7f7ff, #fafafa);
+    border-radius: var(--radius-l);
+    margin-bottom: 3rem;
+
+    h1 {
+      font-size: clamp(3rem, 6vw, 4rem);
+      margin-bottom: 1rem;
+    }
+  }
+
+  .landing-sub {
+    color: var(--muted);
+    margin-bottom: 2rem;
+    font-size: 1.6rem;
+  }
+
+  .landing-features {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.6rem;
+    list-style: none;
+
+    li {
+      background: var(--surface);
+      border: 0.1rem solid var(--border);
+      border-radius: var(--radius-l);
+      padding: 1.6rem;
+
+      h3 {
+        margin-bottom: 0.6rem;
+      }
+    }
+  }
+
+  @media (max-width: 800px) {
+    .landing-hero {
+      padding: 4rem 1.6rem;
+    }
+
+    .landing-features {
+      grid-template-columns: 1fr;
+    }
+  }
+}
